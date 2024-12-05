@@ -20,6 +20,11 @@ import (
 type configuration struct {
 }
 
+type UserTailscaleConfig struct {
+	APIKey  string
+	Tailnet string
+}
+
 // Clone shallow copies the configuration. Your implementation may require a deep copy if
 // your configuration has reference types.
 func (c *configuration) Clone() *configuration {

@@ -1,10 +1,9 @@
 {
-    "id": "com.mattermost.plugin-starter-template",
-    "name": "Plugin Starter Template",
-    "description": "This plugin serves as a starting point for writing a Mattermost plugin.",
-    "homepage_url": "https://github.com/mattermost/mattermost-plugin-starter-template",
-    "support_url": "https://github.com/mattermost/mattermost-plugin-starter-template/issues",
-    "icon_path": "assets/starter-template-icon.svg",
+    "id": "com.github.hanzei.tailscale",
+    "name": "Tailscale",
+    "description": "Integrate Tailscale with Mattermost",
+    "homepage_url": "https://github.com/hanzei/mattermost-plugin-tailscale",
+    "support_url": "https://github.com/hanzei/mattermost-plugin-tailscale/issues",
     "min_server_version": "6.2.1",
     "server": {
         "executables": {
@@ -15,11 +14,8 @@
             "windows-amd64": "server/dist/plugin-windows-amd64.exe"
         }
     },
-    "webapp": {
-        "bundle_path": "webapp/dist/main.js"
-    },
     "settings_schema": {
-        "header": "",
+        "header": "Configure Tailscale plugin settings",
         "footer": "",
         "settings": []
     }
