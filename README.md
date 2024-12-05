@@ -1,50 +1,35 @@
-# Plugin Starter Template
+# Tailscale Plugin for Mattermost
 
-[![Build Status](https://github.com/mattermost/mattermost-plugin-starter-template/actions/workflows/ci.yml/badge.svg)](https://github.com/mattermost/mattermost-plugin-starter-template/actions/workflows/ci.yml)
-[![E2E Status](https://github.com/mattermost/mattermost-plugin-starter-template/actions/workflows/e2e.yml/badge.svg)](https://github.com/mattermost/mattermost-plugin-starter-template/actions/workflows/e2e.yml)
+This plugin integrates Tailscale with Mattermost, allowing users to manage their Tailscale network directly from Mattermost.
 
-This plugin serves as a starting point for writing a Mattermost plugin. Feel free to base your own plugin off this repository.
+## Features
 
-To learn more about plugins, see [our plugin documentation](https://developers.mattermost.com/extend/plugins/).
+- Connect to your Tailscale network using an API key
+- List all devices in your Tailnet
+- View ACL configurations
+- Check your current Tailnet name
 
-This template requires node v16 and npm v8. You can download and install nvm to manage your node versions by following the instructions [here](https://github.com/nvm-sh/nvm). Once you've setup the project simply run `nvm i` within the root folder to use the suggested version of node.
+## Installation
 
-## Getting Started
-Use GitHub's template feature to make a copy of this repository by clicking the "Use this template" button.
+1. Download the latest release from the [releases page](https://github.com/hanzei/mattermost-plugin-tailscale/releases)
+2. Upload the plugin to your Mattermost instance through **System Console > Plugins > Plugin Management**
+3. Enable the plugin
 
-Alternatively shallow clone the repository matching your plugin name:
-```
-git clone --depth 1 https://github.com/mattermost/mattermost-plugin-starter-template com.example.my-plugin
-```
+## Usage
 
-Note that this project uses [Go modules](https://github.com/golang/go/wiki/Modules). Be sure to locate the project outside of `$GOPATH`.
+The plugin adds a `/tailscale` slash command with the following subcommands:
 
-Edit the following files:
-1. `plugin.json` with your `id`, `name`, and `description`:
-```json
-{
-    "id": "com.example.my-plugin",
-    "name": "My Plugin",
-    "description": "A plugin to enhance Mattermost."
-}
-```
+- `/tailscale connect <tailnet> <api-key>` - Connect to your Tailscale network
+- `/tailscale disconnect` - Disconnect from your Tailscale network
+- `/tailscale list` - List all devices in your Tailnet
+- `/tailscale acl` - Show the ACL configuration for your Tailnet
+- `/tailscale tailnet` - Show your current Tailnet name
 
-2. `go.mod` with your Go module path, following the `<hosting-site>/<repository>/<module>` convention:
-```
-module github.com/example/my-plugin
-```
-
-3. `.golangci.yml` with your Go module path:
-```yml
-linters-settings:
-  # [...]
-  goimports:
-    local-prefixes: github.com/example/my-plugin
-```
+## Development
 
 Build your plugin:
 ```
-make
+make dist
 ```
 
 This will produce a single plugin file (with support for multiple architectures) for upload to your Mattermost server:
@@ -168,25 +153,6 @@ To trigger a release, follow these steps:
 
 Simply delete the `server` or `webapp` folders and remove the corresponding sections from `plugin.json`. The build scripts will skip the missing portions automatically.
 
-### How do I include assets in the plugin bundle?
-
-Place them into the `assets` directory. To use an asset at runtime, build the path to your asset and open as a regular file:
-
-```go
-bundlePath, err := p.API.GetBundlePath()
-if err != nil {
-    return errors.Wrap(err, "failed to get bundle path")
-}
-
-profileImage, err := ioutil.ReadFile(filepath.Join(bundlePath, "assets", "profile_image.png"))
-if err != nil {
-    return errors.Wrap(err, "failed to read profile image")
-}
-
-if appErr := p.API.SetProfileImage(userID, profileImage); appErr != nil {
-    return errors.Wrap(err, "failed to set profile image")
-}
-```
 
 ### How do I build the plugin with unminified JavaScript?
 Setting the `MM_DEBUG` environment variable will invoke the debug builds. The simplist way to do this is to simply include this variable in your calls to `make` (e.g. `make dist MM_DEBUG=1`).
