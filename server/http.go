@@ -41,24 +41,13 @@ func (p *Plugin) startTSSever() error {
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
-	h := reverseHandler{proxy: proxy}
 
 	// Serve HTTP traffic over Tailscale
 	go func() {
-		// TODO: Add stop signal
-		if err := http.Serve(ln, h); err != nil {
+		if err := http.Serve(ln, proxy); err != nil {
 			log.Fatalf("Failed to start HTTP server: %v", err)
 		}
 	}()
 
 	return nil
-}
-
-type reverseHandler struct {
-	proxy *httputil.ReverseProxy
-}
-
-func (h reverseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("Forwarding request: %s %s\n", r.Method, r.URL.Path)
-	h.proxy.ServeHTTP(w, r)
 }

@@ -98,8 +98,10 @@ func getAutocompleteData() *model.AutocompleteData {
 	tailscale.AddCommand(tailnet)
 
 	serve := model.NewAutocompleteData("serve", "", "Manage Tailscale serve (System Admins only)")
-	serve.AddCommand(model.NewAutocompleteData("setup", "<auth-key>", "Start Tailscale serve with the given auth key"))
+	serve.AddCommand(model.NewAutocompleteData("setup", "<auth-key>", "Configure Tailscale serve with the given auth key"))
 	serve.AddCommand(model.NewAutocompleteData("status", "", "Check if Tailscale serve is running"))
+	serve.AddCommand(model.NewAutocompleteData("start", "", "Start the Tailscale reverse proxy"))
+	serve.AddCommand(model.NewAutocompleteData("stop", "", "Stop the Tailscale reverse proxy"))
 	tailscale.AddCommand(serve)
 
 	about := command.BuildInfoAutocomplete("about")
@@ -148,8 +150,12 @@ func (p *Plugin) executeCommand(_ *plugin.Context, args *model.CommandArgs) {
 			err = p.handleServeSetup(args)
 		case "status":
 			err = p.handleServeStatus(args)
+		case "start":
+			err = p.handleServeStart(args)
+		case "stop":
+			err = p.handleServeStop(args)
 		default:
-			p.postEphemeral(args.UserId, args.ChannelId, "Available serve commands: setup <auth-key>, status")
+			p.postEphemeral(args.UserId, args.ChannelId, "Available serve commands: setup <auth-key>, status, start, stop")
 			return
 		}
 	case "about":
@@ -389,28 +395,8 @@ func (p *Plugin) handleServeSetup(args *model.CommandArgs) error {
 		return fmt.Errorf("failed to save auth key: %w", err)
 	}
 
-	err = p.startTSSever()
-	if err != nil {
-		return fmt.Errorf("failed to start Tailscale serve: %w", err)
-	}
-
-	dnsName, err := p.tsDNSName()
-	if err != nil {
-		return fmt.Errorf("failed to get Tailscale DNS name: %w", err)
-	}
-
-	message := fmt.Sprintf("Successfully started Tailscale serve!\n"+
-		"Your Mattermost instance is now available via Tailscale HTTPS.\n"+
-		"You can acccess your Mattermost instance at: https://%s\n",
-		dnsName)
-
-	matches, err := p.checkSiteURL(dnsName)
-	if err != nil {
-		return fmt.Errorf("failed to check site URL: %w", err)
-	}
-	if !matches {
-		message += fmt.Sprintf("\nWarning: Your SiteURL does not match the Tailscale DNS name.\nPlease update your SiteURL to: https://%s\n", dnsName)
-	}
+	message := "Successfully configured Tailscale serve!\n" +
+		"Use '/tailscale serve start' to start the reverse proxy."
 
 	p.postEphemeral(args.UserId, args.ChannelId, message)
 	return nil
@@ -437,17 +423,89 @@ func (p *Plugin) handleServeStatus(args *model.CommandArgs) error {
 		return fmt.Errorf("failed to get Tailscale DNS name: %w", err)
 	}
 
-	message := fmt.Sprintf("Tailscale serve is running at %s", dnsName)
+	message := fmt.Sprintf("Tailscale serve is running at https://%s", dnsName)
 
 	matches, err := p.checkSiteURL(dnsName)
 	if err != nil {
 		return fmt.Errorf("failed to check site URL: %w", err)
 	}
 	if !matches {
-		message += fmt.Sprintf("\nWarning: Your SiteURL does not match the Tailscale DNS name.\nPlease update your SiteURL to: https://%s\n", dnsName)
+		message += fmt.Sprintf("\n\n**Warning**: : Your SiteURL does not match the Tailscale DNS name.\nPlease update your SiteURL to: https://%s\n", dnsName)
 	}
 
 	p.postEphemeral(args.UserId, args.ChannelId, message)
+	return nil
+}
+
+func (p *Plugin) handleServeStart(args *model.CommandArgs) error {
+	// Check if user is system admin
+	user, err := p.client.User.Get(args.UserId)
+	if err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if !user.IsSystemAdmin() {
+		return errors.New("only system administrators can use the serve command")
+	}
+
+	config := p.getConfiguration()
+	if !config.Serve {
+		return errors.New("Tailscale serve is not configured. Use '/tailscale serve setup <auth-key>' first")
+	}
+
+	if p.tsServer != nil {
+		return errors.New("Tailscale serve is already running")
+	}
+
+	err = p.startTSSever()
+	if err != nil {
+		return fmt.Errorf("failed to start Tailscale serve: %w", err)
+	}
+
+	dnsName, err := p.tsDNSName()
+	if err != nil {
+		return fmt.Errorf("failed to get Tailscale DNS name: %w", err)
+	}
+
+	message := fmt.Sprintf("Successfully started Tailscale serve!\n"+
+		"Your Mattermost instance is now available via Tailscale HTTPS at: https://%s\n",
+		dnsName)
+
+	matches, err := p.checkSiteURL(dnsName)
+	if err != nil {
+		return fmt.Errorf("failed to check site URL: %w", err)
+	}
+	if !matches {
+		message += fmt.Sprintf("\n\n**Warning**: Your SiteURL does not match the Tailscale DNS name.\nPlease update your SiteURL to: https://%s\n", dnsName)
+	}
+
+	p.postEphemeral(args.UserId, args.ChannelId, message)
+	return nil
+}
+
+// TODO: This command crashes the plugin every time with no good error message. Check what is going wrong.
+func (p *Plugin) handleServeStop(args *model.CommandArgs) error {
+	// Check if user is system admin
+	user, err := p.client.User.Get(args.UserId)
+	if err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if !user.IsSystemAdmin() {
+		return errors.New("only system administrators can use the serve command")
+	}
+
+	if p.tsServer == nil {
+		return errors.New("Tailscale serve is not running")
+	}
+
+	err = p.tsServer.Close()
+	if err != nil {
+		return fmt.Errorf("failed to stop Tailscale serve: %w", err)
+	}
+	p.tsServer = nil
+
+	p.postEphemeral(args.UserId, args.ChannelId, "Successfully stopped Tailscale serve")
 	return nil
 }
 
