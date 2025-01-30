@@ -4,7 +4,7 @@ This plugin integrates Tailscale with Mattermost, allowing users to manage their
 
 ## Features
 
-- Connect to your Tailscale network using an API key
+- Expose your Mattermost instance securely via Tailscale
 - List all devices in your Tailnet
 - View ACL configurations
 - Check your current Tailnet name
@@ -24,6 +24,26 @@ The plugin adds a `/tailscale` slash command with the following subcommands:
 - `/tailscale list` - List all devices in your Tailnet
 - `/tailscale acl` - Show the ACL configuration for your Tailnet
 - `/tailscale tailnet` - Show your current Tailnet name
+- `/tailscale serve setup <auth-key>` - Configure Tailscale serve with an auth key (System Admins only)
+- `/tailscale serve status` - Check if Tailscale serve is running (System Admins only)
+- `/tailscale serve start` - Start the Tailscale reverse proxy (System Admins only)
+- `/tailscale serve stop` - Stop the Tailscale reverse proxy (System Admins only)
+
+### Tailscale Serve
+
+The Tailscale serve feature allows System Administrators to expose their Mattermost instance securely over Tailscale. This provides:
+
+- Automatic HTTPS with valid certificates
+- Access control via Tailscale ACLs
+- No need for public IP addresses or port forwarding
+- Simple setup with just an auth key
+
+To use this feature:
+
+1. Generate an auth key in your Tailscale admin console
+2. Run `/tailscale serve setup <auth-key>` to configure the plugin
+3. Run `/tailscale serve start` to start the reverse proxy
+4. Update your Mattermost Site URL to match the Tailscale DNS name shown in the status message
 
 ## Development
 
