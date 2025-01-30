@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -68,6 +69,10 @@ func (p *Plugin) OnActivate() error {
 
 	tailscale.I_Acknowledge_This_API_Is_Unstable = true
 
+	if p.getConfiguration().Serve {
+		p.startTSSever()
+	}
+
 	return nil
 }
 
@@ -88,6 +93,9 @@ func getAutocompleteData() *model.AutocompleteData {
 
 	tailnet := model.NewAutocompleteData("tailnet", "", "Show your current Tailnet name")
 	tailscale.AddCommand(tailnet)
+
+	serve := model.NewAutocompleteData("serve", "", "Start a Tailscale serve (System Admins only)")
+	tailscale.AddCommand(serve)
 
 	about := command.BuildInfoAutocomplete("about")
 	tailscale.AddCommand(about)
@@ -125,10 +133,12 @@ func (p *Plugin) executeCommand(_ *plugin.Context, args *model.CommandArgs) {
 		err = p.handleTailnet(args)
 	case "disconnect":
 		err = p.handleDisconnect(args)
+	case "serve":
+		err = p.handleServe(args)
 	case "about":
 		err = p.handleAbout(args)
 	default:
-		p.postEphemeral(args.UserId, args.ChannelId, "Available commands: connect <tailnet> <api-key>, disconnect, list, acl, tailnet")
+		p.postEphemeral(args.UserId, args.ChannelId, "Available commands: connect <tailnet> <api-key>, disconnect, list, acl, tailnet, serve")
 		return
 	}
 
@@ -333,6 +343,55 @@ func (p *Plugin) handleAbout(args *model.CommandArgs) error {
 
 	p.postEphemeral(args.UserId, args.ChannelId, text)
 
+	return nil
+}
+
+func (p *Plugin) handleServe(args *model.CommandArgs) error {
+	// Parse command arguments
+	split := strings.Fields(args.Command)
+	if len(split) != 3 {
+		return errors.New("usage: /tailscale serve <auth-key>")
+	}
+	authKey := split[2]
+
+	// Check if user is system admin
+	user, err := p.client.User.Get(args.UserId)
+	if err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if !user.IsSystemAdmin() {
+		return errors.New("only system administrators can use the serve command")
+	}
+
+	// Store the auth key in configuration
+	config := p.getConfiguration()
+	config.Serve = true
+	config.AuthKey = authKey
+	if err := p.SaveConfiguration(config); err != nil {
+		return fmt.Errorf("failed to save auth key: %w", err)
+	}
+
+	dsnName, err := p.startTSSever()
+	if err != nil {
+		return fmt.Errorf("failed to start Tailscale serve: %w", err)
+	}
+
+	cfg := p.client.Configuration.GetConfig()
+	message := fmt.Sprintf("Successfully started Tailscale serve!\n"+
+		"Your Mattermost instance is now available via Tailscale HTTPS.\n"+
+		"You can acccess your Mattermost instance at: https://%s\n",
+		dsnName)
+
+	siteURL, err := url.Parse(*cfg.ServiceSettings.SiteURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse siteURL %q: %w", *cfg.ServiceSettings.SiteURL, err)
+	}
+	if siteURL.Host != dsnName {
+		message += fmt.Sprintf("\nPlease update your SiteURL to: https://%s\n", dsnName)
+	}
+
+	p.postEphemeral(args.UserId, args.ChannelId, message)
 	return nil
 }
 

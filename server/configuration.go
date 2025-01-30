@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -18,6 +19,22 @@ import (
 // If you add non-reference types to your configuration struct, be sure to rewrite Clone as a deep
 // copy appropriate for your types.
 type configuration struct {
+	Serve   bool   `json:"serve"`
+	AuthKey string `json:"auth_key"` // Tailscale auth key for the serve command
+}
+
+func (c *configuration) ToMap() (map[string]interface{}, error) {
+	var out map[string]interface{}
+	data, err := json.Marshal(c)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(data, &out)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 type UserTailscaleConfig struct {
@@ -83,6 +100,22 @@ func (p *Plugin) OnConfigurationChange() error {
 	}
 
 	p.setConfiguration(configuration)
+
+	return nil
+}
+
+func (p *Plugin) SaveConfiguration(configuration *configuration) error {
+	p.setConfiguration(configuration.Clone())
+
+	configMap, err := configuration.ToMap()
+	if err != nil {
+		return err
+	}
+
+	err = p.client.Configuration.SavePluginConfig(configMap)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
