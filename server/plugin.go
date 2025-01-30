@@ -505,6 +505,13 @@ func (p *Plugin) handleServeStop(args *model.CommandArgs) error {
 	}
 	p.tsServer = nil
 
+	// Store the auth key in configuration
+	config := p.getConfiguration()
+	config.Serve = false
+	if err := p.SaveConfiguration(config); err != nil {
+		return fmt.Errorf("failed to save plugin configuration: %w", err)
+	}
+
 	p.postEphemeral(args.UserId, args.ChannelId, "Successfully stopped Tailscale serve")
 	return nil
 }
