@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,15 +8,11 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"tailscale.com/tsnet"
 )
 
-func (p *Plugin) startTSSever() (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
+func (p *Plugin) startTSSever() error {
 	config := p.getConfiguration()
 
 	fileDir := *p.client.Configuration.GetConfig().FileSettings.Directory
@@ -31,18 +26,9 @@ func (p *Plugin) startTSSever() (string, error) {
 	}
 	ln, err := tsServer.ListenTLS("tcp", ":443")
 	if err != nil {
-		return "", fmt.Errorf("Failed to listen: %w", err)
+		return fmt.Errorf("Failed to listen: %w", err)
 	}
-
-	lc, err := tsServer.LocalClient()
-	if err != nil {
-		return "", fmt.Errorf("Failed get local ts client: %w", err)
-	}
-	status, err := lc.Status(ctx)
-	if err != nil {
-		return "", fmt.Errorf("Failed to get status: %w", err)
-	}
-	dnsName := status.Self.DNSName
+	p.tsServer = tsServer
 
 	// Create a reverse proxy
 	la := *p.client.Configuration.GetConfig().ServiceSettings.ListenAddress
@@ -51,7 +37,7 @@ func (p *Plugin) startTSSever() (string, error) {
 	}
 	target, err := url.Parse("http://" + la)
 	if err != nil {
-		return "", fmt.Errorf("Failed to parse ListenAddress: %w", err)
+		return fmt.Errorf("Failed to parse ListenAddress: %w", err)
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
@@ -65,7 +51,7 @@ func (p *Plugin) startTSSever() (string, error) {
 		}
 	}()
 
-	return dnsName, nil
+	return nil
 }
 
 type reverseHandler struct {
